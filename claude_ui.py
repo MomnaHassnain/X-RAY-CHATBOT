@@ -426,6 +426,7 @@ with col2:
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Handle Send Button
+    # Handle Send Button - placed right after Send button in col2
     if send_clicked and user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
 
@@ -439,31 +440,47 @@ with col2:
                     mime_type, _ = mimetypes.guess_type(image_file.name)
                     mime_type = mime_type or "image/jpeg"
 
-                    files = {
-                        "image": (image_file.name, image_bytes, mime_type)
-                    }
-                    data = {
-                        "query": user_input
-                    }
-
-                    response = requests.post(API_URL, files=files, data=data)
-
-                    if response.status_code == 200:
-                        result = response.json()
-                        ai_response = result.get("response", "✅ API call succeeded but no response returned.")
+                    valid_medical_keywords = ["xray", "ct", "mri"]
+                    if not any(kw in image_file.name.lower() for kw in valid_medical_keywords):
+                        ai_response = "❌ Sorry, I can only help with medical images like X-rays, MRIs, or CT scans. Please upload a valid image."
                     else:
-                        ai_response = f"❌ API error {response.status_code}: {response.text}"
+                        files = {
+                            "image": (image_file.name, image_bytes, mime_type)
+                        }
+                        data = {
+                            "query": user_input
+                        }
+
+                        response = requests.post(API_URL, files=files, data=data)
+
+                        if response.status_code == 200:
+                            result = response.json()
+                            ai_response = result.get("response", "").strip()
+
+                            if ai_response.lower() in [
+                                "not_medical_image",
+                                "sorry, i can only help with medical images like x-rays, mris, or ct scans."
+                            ] or any(term in ai_response.lower() for term in ["cat", "landscape", "woman", "selfie", "dog"]):
+                                ai_response = "❌ Sorry, I can only help with medical images like X-rays, MRIs, or CT scans. Please upload a valid image."
+                        else:
+                            ai_response = f"❌ API error {response.status_code}: {response.text}"
             except Exception as e:
                 ai_response = f"❌ Unexpected error: {e}"
         else:
             ai_response = "⚠️ Please upload a medical image first."
 
-        st.session_state.messages.append({"role": "ai", "content": ai_response})
+        # Show result directly below chat input
+        st.markdown("### 🧠 X-Ray Chatbot", unsafe_allow_html=True)
+        st.markdown(f"**You:** {user_input}")
+        st.markdown(f"**AI Assistant:** {ai_response}")
 
-    # Display Chat
-    if st.session_state.messages:
-        st.markdown("### 🧠 X-Ray Chatbot", unsafe_allow_html=False)
+#     # ✅ Append final assistant message
+#     st.session_state.messages.append({"role": "ai", "content": ai_response})
 
-        for message in st.session_state.messages:
-            role = "You" if message["role"] == "user" else "AI Assistant"
-            st.markdown(f"**{role}:** {message['content']}")
+# # ✅ Chat Display
+# if st.session_state.messages:
+#     st.markdown("### 🧠 X-Ray Chatbot", unsafe_allow_html=False)
+
+#     for message in st.session_state.messages:
+#         role = "You" if message["role"] == "user" else "AI Assistant"
+#         st.markdown(f"**{role}:** {message['content']}")
